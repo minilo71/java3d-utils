@@ -68,9 +68,7 @@ import javax.vecmath.Vector3f;
 public class NormalGenerator {
 
   private double creaseAngle;
-  private Vector3f facetNorms[];
-  private ArrayList tally;
-  private GeometryInfo gi;
+  private ArrayList<ArrayList<Integer>> tally;
   private int coordInds[];
   private int normalInds[];
   private int colorInds[];
@@ -96,15 +94,15 @@ public class NormalGenerator {
 
   // Calculate the normal of each triangle in the list by finding
   // the cross product
-  private void calculatefacetNorms()
+  private Vector3f[] calculatefacetNorms(GeometryInfo gi)
   {
     Point3f coordinates[] = gi.getCoordinates();
-    facetNorms = new Vector3f[coordInds.length / 3];
+    Vector3f[] facetNorms = new Vector3f[coordInds.length / 3];
     Vector3f a = new Vector3f();
     Vector3f b = new Vector3f();
     if ((DEBUG & 1) != 0) System.out.println("Facet normals:");
 
-    if (gi.getOldPrim() != gi.QUAD_ARRAY) {
+    if (gi.getOldPrim() != GeometryInfo.QUAD_ARRAY) {
       for (int t = 0 ; t < coordInds.length ; t += 3) {
 	a.sub(coordinates[coordInds[t + 2]], coordinates[coordInds[t + 1]]);
 	b.sub(coordinates[coordInds[t + 0]], coordinates[coordInds[t + 1]]);
@@ -146,6 +144,7 @@ public class NormalGenerator {
 	}
       }
     }
+    return facetNorms;
   } // End of calculatefacetNorms
 
 
@@ -170,10 +169,10 @@ public class NormalGenerator {
   //
   // Returns the largest number of triangles that share a single normal.
   //
-  private int createHardEdges()
+  private int createHardEdges(Vector3f[] facetNorms)
   {
     EdgeTable et = new EdgeTable(coordInds);
-    tally = new ArrayList();
+    tally = new ArrayList<ArrayList<Integer>>();
     int normalMap[] = new int[coordInds.length];
     int maxShare = 1;
     float cosine;
@@ -194,7 +193,7 @@ public class NormalGenerator {
 	    "Coordinate Index " + c + ": vertex " + coordInds[c]);
 	}
 	// Create a list of vertices used for calculating this normal
-	ArrayList sharers = new ArrayList();
+	ArrayList<Integer> sharers = new ArrayList<Integer>();
 	tally.add(sharers);
 	// Put this coordinate in the list
 	sharers.add(new Integer(c));
@@ -300,7 +299,7 @@ public class NormalGenerator {
       System.out.println("Tally:");
       for (int i = 0 ; i < tally.size() ; i++) {
 	System.out.print("  " + i + ": ");
-	ArrayList sharers = (ArrayList)(tally.get(i));
+	ArrayList<Integer> sharers = tally.get(i);
 	for (int j = 0 ; j < sharers.size() ; j++) {
 	  System.out.print(" " + sharers.get(j));
 	}
@@ -334,10 +333,10 @@ public class NormalGenerator {
   // indexed, table.  That way, to tell if two triangles have the
   // same normal, we just need to compare indexes.  This would speed up
   // the process of checking for duplicates.
-  private void calculateVertexNormals(int maxShare)
+  private void calculateVertexNormals(GeometryInfo gi, Vector3f[] facetNorms, int maxShare)
   {
     Vector3f normals[];
-    ArrayList sharers;
+    ArrayList<Integer> sharers;
     int triangle;
     Vector3f fn[];	// Normals of facets joined by this vertex
     int fnsize;		// Number of elements currently ised in fn
@@ -347,7 +346,7 @@ public class NormalGenerator {
       normals = new Vector3f[tally.size()];
       normalInds = new int[coordInds.length];
       for (int n = 0 ; n < tally.size() ; n++) {
-	sharers = (ArrayList)(tally.get(n));
+	sharers = tally.get(n);
 	if ((DEBUG & 128) != 0) {
 	  System.out.println(n + ": " + sharers.size() +
 	    " triangles:");
@@ -355,7 +354,7 @@ public class NormalGenerator {
 	fnsize = 0;
 	normals[n] = new Vector3f();
 	for (int t = 0 ; t < sharers.size() ; t++) {
-	  int v = ((Integer)sharers.get(t)).intValue();
+	  int v = sharers.get(t).intValue();
 	  // See if index removed by hard edge process
 	  if (v != -1) {
 	    triangle = v / 3;
@@ -385,7 +384,7 @@ public class NormalGenerator {
 	}
 	if ((DEBUG & 128) != 0) {
 	  for (int t = 0 ; t < sharers.size() ; t++) {
-	    int v = ((Integer)sharers.get(t)).intValue();
+	    int v = sharers.get(t).intValue();
 	    if (v != -1) {
 	      triangle = v / 3;
 	      System.out.println("  " + facetNorms[triangle]);
@@ -462,7 +461,7 @@ public class NormalGenerator {
       geom.setTextureCoordinateIndices(i,
 	triToQuadIndices(geom.getTextureCoordinateIndices(i)));
     }
-    geom.setPrimitive(gi.QUAD_ARRAY);
+    geom.setPrimitive(GeometryInfo.QUAD_ARRAY);
   } // End of convertTriToQuad()
 
 
@@ -514,8 +513,8 @@ public class NormalGenerator {
     // Calculate new stripCounts array
     //
     int tri = 0;	// Which triangle currently being converted
-    ArrayList newStripCounts;
-    newStripCounts = new ArrayList(oldStripCounts.length + 100);
+    ArrayList<Integer> newStripCounts;
+    newStripCounts = new ArrayList<Integer>(oldStripCounts.length + 100);
 
     // Use the original stripCounts array
     for (int f = 0 ; f < oldStripCounts.length ; f++) {
@@ -547,7 +546,7 @@ public class NormalGenerator {
     // Convert from ArrayList to int[]
     int sc[] = new int[newStripCounts.size()];
     for (int i = 0 ; i < sc.length ; i++)
-      sc[i] = ((Integer)newStripCounts.get(i)).intValue();
+      sc[i] = newStripCounts.get(i).intValue();
     newStripCounts = null;
 
     //
@@ -583,7 +582,7 @@ public class NormalGenerator {
     }
 
     geom.setStripCounts(sc);
-    geom.setPrimitive(gi.TRIANGLE_FAN_ARRAY);
+    geom.setPrimitive(GeometryInfo.TRIANGLE_FAN_ARRAY);
   } // End of convertTriToFan()
 
 
@@ -629,8 +628,8 @@ public class NormalGenerator {
     // Calculate new stripCounts array
     //
     int tri = 0;	// Which triangle currently being converted
-    ArrayList newStripCounts;
-    newStripCounts = new ArrayList(oldStripCounts.length + 100);
+    ArrayList<Integer> newStripCounts;
+    newStripCounts = new ArrayList<Integer>(oldStripCounts.length + 100);
 
     // Use the original stripCounts array
     for (int f = 0 ; f < oldStripCounts.length ; f++) {
@@ -685,7 +684,7 @@ public class NormalGenerator {
     // Convert from ArrayList to int[]
     int sc[] = new int[newStripCounts.size()];
     for (int i = 0 ; i < sc.length ; i++)
-      sc[i] = ((Integer)newStripCounts.get(i)).intValue();
+      sc[i] = newStripCounts.get(i).intValue();
     newStripCounts = null;
 
     //
@@ -721,7 +720,7 @@ public class NormalGenerator {
     }
 
     geom.setStripCounts(sc);
-    geom.setPrimitive(gi.TRIANGLE_STRIP_ARRAY);
+    geom.setPrimitive(GeometryInfo.TRIANGLE_STRIP_ARRAY);
   }// End of convertTriToStrip()
 
 
@@ -736,7 +735,7 @@ public class NormalGenerator {
   void convertBackToOldPrim(GeometryInfo geom, int oldPrim,
 			    int oldStripCounts[])
   {
-    if (oldPrim == geom.TRIANGLE_ARRAY) return;
+    if (oldPrim == GeometryInfo.TRIANGLE_ARRAY) return;
 
     switch (oldPrim) {
     case GeometryInfo.QUAD_ARRAY:
@@ -770,9 +769,8 @@ public class NormalGenerator {
    * if GeometryInfo.getGeometryArray() (or getIndexedGeometryArray())
    * is called without stripifying first.
    */
-  public void generateNormals(GeometryInfo geom)
+  public void generateNormals(GeometryInfo gi)
   {
-    gi = geom;
     gi.setNormals((Vector3f[])null);
     gi.setNormalIndices(null);
 
@@ -781,7 +779,7 @@ public class NormalGenerator {
       time = System.currentTimeMillis();
     }
 
-    if (gi.getPrimitive() == gi.POLYGON_ARRAY) {
+    if (gi.getPrimitive() == GeometryInfo.POLYGON_ARRAY) {
       if (tr == null) tr = new Triangulator();
       tr.triangulate(gi);
     } else {
@@ -808,21 +806,21 @@ public class NormalGenerator {
       time = System.currentTimeMillis();
     }
 
-    calculatefacetNorms();
+	Vector3f[] facetNorms = calculatefacetNorms(gi);
     if ((DEBUG & 16) != 0) {
       t2 += System.currentTimeMillis() - time;
       System.out.println("Calculate Facet Normals: " + t2 + " ms");
       time = System.currentTimeMillis();
     }
 
-    int maxShare = createHardEdges();
+    int maxShare = createHardEdges(facetNorms);
     if ((DEBUG & 16) != 0) {
       t3 += System.currentTimeMillis() - time;
       System.out.println("Hard Edges: " + t3 + " ms");
       time = System.currentTimeMillis();
     }
 
-    calculateVertexNormals(maxShare);
+    calculateVertexNormals(gi, facetNorms, maxShare);
     if ((DEBUG & 16) != 0) {
       t5 += System.currentTimeMillis() - time;
       System.out.println("Vertex Normals: " + t5 + " ms");
